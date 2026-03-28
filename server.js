@@ -86,11 +86,23 @@ async function proxyApi(request, response) {
       body,
     });
     const responseBuffer = Buffer.from(await upstreamResponse.arrayBuffer());
+    const retryAfter = upstreamResponse.headers.get('retry-after');
     const headers = {
       'content-type':
         upstreamResponse.headers.get('content-type') ?? 'application/json; charset=utf-8',
       'cache-control': 'no-store',
     };
+
+    if (retryAfter) {
+      headers['retry-after'] = retryAfter;
+    }
+
+    if (upstreamResponse.status === 429) {
+      console.warn('[frontend-proxy] upstream rate limited request', {
+        targetUrl,
+        retryAfter: retryAfter ?? null,
+      });
+    }
 
     response.writeHead(upstreamResponse.status, headers);
 
@@ -101,6 +113,11 @@ async function proxyApi(request, response) {
 
     response.end();
   } catch (error) {
+    console.warn('[frontend-proxy] backend unavailable', {
+      targetUrl,
+      details: error instanceof Error ? error.message : String(error),
+    });
+
     response.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
     response.end(
       JSON.stringify({

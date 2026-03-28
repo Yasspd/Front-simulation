@@ -1,6 +1,8 @@
 import { DEFAULT_CONFIG, MODE_HINTS } from '../config.js';
 import { clamp, pickDefinedValues } from '../utils/formatters.js';
 
+const DEFAULT_RATE_LIMIT_DELAY_MS = 5000;
+
 export class SimulationSession {
   constructor(store, apiClient) {
     this.store = store;
@@ -12,8 +14,11 @@ export class SimulationSession {
       isLoading: false,
       isCompleted: false,
       lastFrameAt: 0,
+      activeRequestKind: null,
+      blockedUntil: 0,
     };
     this.listeners = new Set();
+    this.cooldownTimer = null;
   }
 
   subscribe(listener) {
@@ -31,6 +36,152 @@ export class SimulationSession {
 
   getPlaybackState() {
     return { ...this.playback };
+  }
+
+  getCooldownRemainingMs(now = Date.now()) {
+    return Math.max(0, this.playback.blockedUntil - now);
+  }
+
+  hasCooldown(now = Date.now()) {
+    return this.getCooldownRemainingMs(now) > 0;
+  }
+
+  getCooldownMessage() {
+    const retryAfterSeconds = Math.ceil(this.getCooldownRemainingMs() / 1000);
+
+    return `Новый запрос временно заблокирован. Повторите через ${retryAfterSeconds} сек.`;
+  }
+
+  scheduleCooldownRelease(delayMs) {
+    if (this.cooldownTimer) {
+      globalThis.clearTimeout(this.cooldownTimer);
+    }
+
+    this.cooldownTimer = globalThis.setTimeout(() => {
+      this.cooldownTimer = null;
+
+      if (this.hasCooldown()) {
+        return;
+      }
+
+      this.playback = {
+        ...this.playback,
+        blockedUntil: 0,
+      };
+
+      if (this.store.getState().backendStatus === 'rate_limited') {
+        this.store.update({
+          backendStatus:
+            this.store.getState().scenarios.length > 0 || this.store.getState().run
+              ? 'online'
+              : 'connecting',
+        });
+      }
+
+      this.notify();
+    }, delayMs + 50);
+  }
+
+  beginRequest(requestKind) {
+    this.playback = {
+      ...this.playback,
+      isLoading: true,
+      isRunning: false,
+      isPaused: true,
+      isCompleted: false,
+      lastFrameAt: 0,
+      activeRequestKind: requestKind,
+    };
+    this.notify();
+    this.store.update({
+      backendStatus: 'loading',
+      error: '',
+    });
+  }
+
+  finishRequest(patch = {}) {
+    this.playback = {
+      ...this.playback,
+      isLoading: false,
+      activeRequestKind: null,
+      ...patch,
+    };
+    this.notify();
+  }
+
+  applyRateLimit(error, fallbackMessage) {
+    const retryAfterMs =
+      error instanceof Error &&
+      'retryAfterMs' in error &&
+      Number.isFinite(Number(error.retryAfterMs))
+        ? Math.max(DEFAULT_RATE_LIMIT_DELAY_MS, Number(error.retryAfterMs))
+        : DEFAULT_RATE_LIMIT_DELAY_MS;
+    const retryAfterSeconds = Math.ceil(retryAfterMs / 1000);
+    const details =
+      error instanceof Error && error.message
+        ? error.message
+        : fallbackMessage;
+    const userMessage = `Слишком много запросов. Повторите через ${retryAfterSeconds} сек. ${details}`.trim();
+
+    console.warn('[simulation-session] rate limited', {
+      requestKind: this.playback.activeRequestKind,
+      retryAfterMs,
+      details,
+    });
+
+    this.store.update({
+      backendStatus: 'rate_limited',
+      error: userMessage,
+    });
+
+    this.finishRequest({
+      isRunning: false,
+      isPaused: true,
+      blockedUntil: Date.now() + retryAfterMs,
+      lastFrameAt: 0,
+    });
+    this.scheduleCooldownRelease(retryAfterMs);
+  }
+
+  handleRequestError(error, fallbackMessage) {
+    const isRateLimited =
+      error instanceof Error &&
+      'status' in error &&
+      Number(error.status) === 429;
+
+    if (isRateLimited) {
+      this.applyRateLimit(error, fallbackMessage);
+      return;
+    }
+
+    this.store.update({
+      backendStatus: 'offline',
+      error: error instanceof Error ? error.message : fallbackMessage,
+    });
+
+    this.finishRequest({
+      isRunning: false,
+      isPaused: true,
+      lastFrameAt: 0,
+    });
+  }
+
+  canStartBackendRequest() {
+    if (this.playback.isLoading) {
+      return false;
+    }
+
+    if (!this.hasCooldown()) {
+      return true;
+    }
+
+    this.store.update({
+      backendStatus: 'rate_limited',
+      error: this.getCooldownMessage(),
+    });
+    this.notify();
+
+    return false;
   }
 
   async bootstrap() {
@@ -51,6 +202,16 @@ export class SimulationSession {
         });
       }
     } catch (error) {
+      const isRateLimited =
+        error instanceof Error &&
+        'status' in error &&
+        Number(error.status) === 429;
+
+      if (isRateLimited) {
+        this.applyRateLimit(error, 'Список сценариев временно ограничен');
+        return;
+      }
+
       this.store.update({
         backendStatus: 'offline',
         error: error instanceof Error ? error.message : 'Не удалось связаться с бэкендом',
@@ -65,7 +226,7 @@ export class SimulationSession {
   }
 
   async startSimulation() {
-    if (this.playback.isLoading) {
+    if (!this.canStartBackendRequest()) {
       return;
     }
 
@@ -73,7 +234,7 @@ export class SimulationSession {
   }
 
   async restartSimulation() {
-    if (this.playback.isLoading) {
+    if (!this.canStartBackendRequest()) {
       return;
     }
 
@@ -81,25 +242,13 @@ export class SimulationSession {
   }
 
   async loadLatestRun() {
-    if (this.playback.isLoading) {
+    if (!this.canStartBackendRequest()) {
       return;
     }
 
-    this.playback = {
-      ...this.playback,
-      isLoading: true,
-      isRunning: false,
-      isPaused: true,
-      isCompleted: false,
-      lastFrameAt: 0,
-    };
-    this.notify();
+    this.beginRequest('latest');
 
     try {
-      this.store.update({
-        backendStatus: 'loading',
-        error: '',
-      });
       const run = await this.apiClient.getLatestRun();
 
       this.store.update({
@@ -108,28 +257,15 @@ export class SimulationSession {
         error: '',
       });
 
-      this.playback = {
-        ...this.playback,
+      this.finishRequest({
         currentStepFloat: 1,
         isRunning: true,
         isPaused: false,
-        isLoading: false,
         isCompleted: false,
         lastFrameAt: 0,
-      };
-      this.notify();
-    } catch (error) {
-      this.store.update({
-        backendStatus: 'offline',
-        error: error instanceof Error ? error.message : 'Не удалось загрузить последний запуск',
       });
-      this.playback = {
-        ...this.playback,
-        isLoading: false,
-        isRunning: false,
-        isPaused: true,
-      };
-      this.notify();
+    } catch (error) {
+      this.handleRequestError(error, 'Не удалось загрузить последний запуск');
     }
   }
 
@@ -183,6 +319,8 @@ export class SimulationSession {
       isLoading: false,
       isCompleted: false,
       lastFrameAt: 0,
+      activeRequestKind: null,
+      blockedUntil: this.playback.blockedUntil,
     };
     this.notify();
   }
@@ -209,7 +347,7 @@ export class SimulationSession {
   }
 
   async injectEventAt(coordinates, randomize = false) {
-    if (this.playback.isLoading) {
+    if (!this.canStartBackendRequest()) {
       return;
     }
 
@@ -221,7 +359,7 @@ export class SimulationSession {
     };
     const target = randomize ? randomCoordinates : coordinates;
 
-    await this.runSimulation({
+    const hasStartedRun = await this.runSimulation({
       preserveStep: true,
       override: {
         x: target.x,
@@ -229,6 +367,10 @@ export class SimulationSession {
         startStep: currentStep,
       },
     });
+
+    if (!hasStartedRun) {
+      return;
+    }
 
     this.updateConfig({
       activeEventOverride: {
@@ -279,19 +421,7 @@ export class SimulationSession {
   async runSimulation({ override = {}, preserveStep = false }) {
     const previousStep = preserveStep ? this.playback.currentStepFloat : 1;
 
-    this.playback = {
-      ...this.playback,
-      isLoading: true,
-      isRunning: false,
-      isPaused: true,
-      isCompleted: false,
-      lastFrameAt: 0,
-    };
-    this.notify();
-    this.store.update({
-      backendStatus: 'loading',
-      error: '',
-    });
+    this.beginRequest(preserveStep ? 'inject' : 'run');
 
     try {
       const run = await this.apiClient.runSimulation(this.buildRunPayload(override));
@@ -302,28 +432,17 @@ export class SimulationSession {
         error: '',
       });
 
-      this.playback = {
+      this.finishRequest({
         currentStepFloat: preserveStep ? clamp(previousStep, 1, run.requestedSteps) : 1,
         isRunning: true,
         isPaused: false,
-        isLoading: false,
         isCompleted: false,
         lastFrameAt: 0,
-      };
-      this.notify();
-    } catch (error) {
-      this.store.update({
-        backendStatus: 'offline',
-        error: error instanceof Error ? error.message : 'Не удалось запустить симуляцию',
       });
-
-      this.playback = {
-        ...this.playback,
-        isLoading: false,
-        isRunning: false,
-        isPaused: true,
-      };
-      this.notify();
+      return true;
+    } catch (error) {
+      this.handleRequestError(error, 'Не удалось запустить симуляцию');
+      return false;
     }
   }
 

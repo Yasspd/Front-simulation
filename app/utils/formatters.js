@@ -25,6 +25,10 @@ export function humanizeBackendStatus(status) {
     return 'Бэкенд: онлайн';
   }
 
+  if (status === 'rate_limited') {
+    return 'Бэкенд: временный лимит запросов';
+  }
+
   if (status === 'offline') {
     return 'Бэкенд: недоступен';
   }
@@ -39,6 +43,10 @@ export function humanizeBackendStatus(status) {
 export function humanizeBackendStatusShort(status) {
   if (status === 'online') {
     return 'онлайн';
+  }
+
+  if (status === 'rate_limited') {
+    return 'лимит';
   }
 
   if (status === 'offline') {
@@ -148,6 +156,8 @@ export function mergePlain(target, patch) {
 
 export function pickDefinedValues(source) {
   return Object.fromEntries(
-    Object.entries(source).filter(([, value]) => value !== undefined && value !== null && value !== ''),
+    Object.entries(source).filter(
+      ([, value]) => value !== undefined && value !== null && value !== '',
+    ),
   );
 }

@@ -328,16 +328,20 @@ export class ControlPanel {
     const state = this.store.getState();
     const hasRun = Boolean(state.run);
     const injectArmed = state.config.render.armInject;
+    const backendLocked = playback.isLoading || playback.blockedUntil > Date.now();
 
     this.elements.pauseButton.textContent = playback.isPaused ? 'Продолжить' : 'Пауза';
     this.elements.injectButton.textContent = injectArmed
       ? 'Отменить событие'
       : 'Внести событие';
-    this.elements.startButton.disabled = playback.isLoading;
+    this.elements.startButton.disabled = backendLocked;
     this.elements.pauseButton.disabled = !hasRun || playback.isLoading;
     this.elements.resetButton.disabled = !hasRun;
-    this.elements.restartButton.disabled = playback.isLoading;
-    this.elements.latestButton.disabled = playback.isLoading;
+    this.elements.restartButton.disabled = backendLocked;
+    this.elements.latestButton.disabled = backendLocked;
+    this.elements.injectButton.disabled = backendLocked;
+    this.elements.centerEventButton.disabled = backendLocked;
+    this.elements.randomEventButton.disabled = backendLocked;
     this.elements.injectButton.classList.toggle('primary-button', injectArmed);
     this.elements.floatingHint.textContent = injectArmed
       ? 'Режим внедрения активирован. Клик по полю перезапустит бэкенд с текущего шага проигрывания.'
