@@ -2,6 +2,7 @@ import { DEFAULT_CONFIG, MODE_HINTS } from '../config.js';
 import { clamp, pickDefinedValues } from '../utils/formatters.js';
 
 const DEFAULT_RATE_LIMIT_DELAY_MS = 5000;
+const MAX_RATE_LIMIT_DELAY_MS = 15000;
 
 export class SimulationSession {
   constructor(store, apiClient) {
@@ -16,6 +17,7 @@ export class SimulationSession {
       lastFrameAt: 0,
       activeRequestKind: null,
       blockedUntil: 0,
+      blockedRequestKind: null,
     };
     this.listeners = new Set();
     this.cooldownTimer = null;
@@ -67,6 +69,7 @@ export class SimulationSession {
       this.playback = {
         ...this.playback,
         blockedUntil: 0,
+        blockedRequestKind: null,
       };
 
       if (this.store.getState().backendStatus === 'rate_limited') {
@@ -110,12 +113,13 @@ export class SimulationSession {
   }
 
   applyRateLimit(error, fallbackMessage) {
-    const retryAfterMs =
+    const retryAfterMsRaw =
       error instanceof Error &&
       'retryAfterMs' in error &&
       Number.isFinite(Number(error.retryAfterMs))
         ? Math.max(DEFAULT_RATE_LIMIT_DELAY_MS, Number(error.retryAfterMs))
         : DEFAULT_RATE_LIMIT_DELAY_MS;
+    const retryAfterMs = Math.min(MAX_RATE_LIMIT_DELAY_MS, retryAfterMsRaw);
     const retryAfterSeconds = Math.ceil(retryAfterMs / 1000);
     const details =
       error instanceof Error && error.message
@@ -138,6 +142,7 @@ export class SimulationSession {
       isRunning: false,
       isPaused: true,
       blockedUntil: Date.now() + retryAfterMs,
+      blockedRequestKind: this.playback.activeRequestKind ?? 'bootstrap',
       lastFrameAt: 0,
     });
     this.scheduleCooldownRelease(retryAfterMs);
@@ -166,12 +171,19 @@ export class SimulationSession {
     });
   }
 
-  canStartBackendRequest() {
+  canStartBackendRequest(requestKind) {
     if (this.playback.isLoading) {
       return false;
     }
 
     if (!this.hasCooldown()) {
+      return true;
+    }
+
+    if (
+      this.playback.blockedRequestKind &&
+      this.playback.blockedRequestKind !== requestKind
+    ) {
       return true;
     }
 
@@ -226,7 +238,7 @@ export class SimulationSession {
   }
 
   async startSimulation() {
-    if (!this.canStartBackendRequest()) {
+    if (!this.canStartBackendRequest('run')) {
       return;
     }
 
@@ -234,7 +246,7 @@ export class SimulationSession {
   }
 
   async restartSimulation() {
-    if (!this.canStartBackendRequest()) {
+    if (!this.canStartBackendRequest('run')) {
       return;
     }
 
@@ -242,7 +254,7 @@ export class SimulationSession {
   }
 
   async loadLatestRun() {
-    if (!this.canStartBackendRequest()) {
+    if (!this.canStartBackendRequest('latest')) {
       return;
     }
 
@@ -321,6 +333,7 @@ export class SimulationSession {
       lastFrameAt: 0,
       activeRequestKind: null,
       blockedUntil: this.playback.blockedUntil,
+      blockedRequestKind: this.playback.blockedRequestKind,
     };
     this.notify();
   }
@@ -347,7 +360,7 @@ export class SimulationSession {
   }
 
   async injectEventAt(coordinates, randomize = false) {
-    if (!this.canStartBackendRequest()) {
+    if (!this.canStartBackendRequest('run')) {
       return;
     }
 

@@ -25,6 +25,25 @@ function buildRequestKey(url, options) {
   return `${method}:${url}:${body}`;
 }
 
+function normalizeOrigin(origin) {
+  return origin.replace(/\/+$/, '');
+}
+
+function resolveApiBaseUrl() {
+  const configuredOrigin =
+    globalThis.window?.__SIMULATION_BACKEND_ORIGIN__ ||
+    globalThis.document
+      ?.querySelector('meta[name="simulation-backend-origin"]')
+      ?.getAttribute('content')
+      ?.trim();
+
+  if (configuredOrigin) {
+    return `${normalizeOrigin(configuredOrigin)}/simulation`;
+  }
+
+  return 'http://127.0.0.1:3000/simulation';
+}
+
 export class SimulationApiError extends Error {
   constructor(message, details = {}) {
     super(message);
@@ -34,7 +53,7 @@ export class SimulationApiError extends Error {
 }
 
 export class SimulationApiClient {
-  constructor(baseUrl = '/api') {
+  constructor(baseUrl = resolveApiBaseUrl()) {
     this.baseUrl = baseUrl;
     this.inFlightRequests = new Map();
   }
@@ -89,15 +108,15 @@ export class SimulationApiClient {
   }
 
   fetchScenarios() {
-    return this.request('/simulation/scenarios');
+    return this.request('/scenarios');
   }
 
   getLatestRun() {
-    return this.request('/simulation/latest');
+    return this.request('/latest');
   }
 
   runSimulation(payload) {
-    return this.request('/simulation/run', {
+    return this.request('/run', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -328,7 +328,7 @@ export class ControlPanel {
     const state = this.store.getState();
     const hasRun = Boolean(state.run);
     const injectArmed = state.config.render.armInject;
-    const backendLocked = playback.isLoading || playback.blockedUntil > Date.now();
+    const backendLocked = playback.isLoading;
 
     this.elements.pauseButton.textContent = playback.isPaused ? 'Продолжить' : 'Пауза';
     this.elements.injectButton.textContent = injectArmed
