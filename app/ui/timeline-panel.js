@@ -1,0 +1,59 @@
+import {
+  formatStep,
+  humanizeEventPhase,
+  humanizeMode,
+  humanizeProfile,
+} from '../utils/formatters.js';
+
+export class TimelinePanel {
+  constructor(session) {
+    this.session = session;
+    this.elements = {
+      scrubber: document.getElementById('timelineScrubber'),
+      timelineSubtitle: document.getElementById('timelineSubtitle'),
+      timelineMeta: document.getElementById('timelineMeta'),
+      timelineStartLabel: document.getElementById('timelineStartLabel'),
+      timelineCenterLabel: document.getElementById('timelineCenterLabel'),
+      timelineEndLabel: document.getElementById('timelineEndLabel'),
+    };
+
+    this.elements.scrubber.addEventListener('input', (event) => {
+      this.session.seek(Number(event.target.value));
+    });
+  }
+
+  render(viewState, playbackSnapshot) {
+    const playback = viewState.playback;
+
+    if (!viewState.run) {
+      this.elements.scrubber.min = '1';
+      this.elements.scrubber.max = '1';
+      this.elements.scrubber.value = '1';
+      this.elements.timelineMeta.textContent = 'seed ---';
+      this.elements.timelineStartLabel.textContent = 'шаг 1';
+      this.elements.timelineCenterLabel.textContent = 'ожидание';
+      this.elements.timelineEndLabel.textContent = 'шаг 1';
+      this.elements.timelineSubtitle.textContent =
+        'Локальное проигрывание запуска бэкенда с интерполяцией';
+      return;
+    }
+
+    this.elements.scrubber.min = '1';
+    this.elements.scrubber.max = String(viewState.run.requestedSteps);
+    this.elements.scrubber.step = '0.01';
+    this.elements.scrubber.value = String(playback.currentStepFloat);
+    this.elements.timelineMeta.textContent = `сид ${viewState.run.seed} / ${humanizeMode(viewState.run.mode)} / ${humanizeProfile(viewState.run.profile)}`;
+    this.elements.timelineStartLabel.textContent = 'шаг 1';
+    this.elements.timelineCenterLabel.textContent = playback.isLoading
+      ? 'загрузка'
+      : playback.isRunning
+        ? `идёт / ${formatStep(playback.currentStepFloat)}`
+        : playback.isCompleted
+          ? 'завершено'
+          : 'пауза';
+    this.elements.timelineEndLabel.textContent = `шаг ${viewState.run.requestedSteps}`;
+    this.elements.timelineSubtitle.textContent = playbackSnapshot.event?.isActive
+      ? `Событие ${humanizeEventPhase(playbackSnapshot.event.phase)} / текущая интенсивность ${playbackSnapshot.interpolatedStep.activeEventIntensity.toFixed(2)}`
+      : 'Локальное проигрывание запуска бэкенда с интерполяцией';
+  }
+}

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Панель телеметрии симуляции</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <canvas id="simulation-canvas" aria-label="Поле визуализации симуляции"></canvas>
+
+      <aside class="control-panel" id="controlPanel">
+        <div class="panel-topbar">
+          <div>
+            <div class="panel-title">Панель управления</div>
+            <div class="panel-subtitle" id="backendStatusText">Бэкенд: подключение...</div>
+          </div>
+          <div class="status-pill" id="backendStatusPill">...</div>
+        </div>
+
+        <div class="mode-toggle">
+          <button type="button" class="mode-chip active" data-settings-level="simple">
+            ПРОСТОЙ
+          </button>
+          <button type="button" class="mode-chip" data-settings-level="advanced">
+            РАСШИРЕННЫЙ
+          </button>
+        </div>
+
+        <section class="panel-section">
+          <div class="section-heading">Управление запуском</div>
+          <div class="button-row button-row-main">
+            <button type="button" id="startButton" class="primary-button">Пуск</button>
+            <button type="button" id="pauseButton">Пауза</button>
+            <button type="button" id="resetButton">Сброс</button>
+          </div>
+          <div class="button-row">
+            <button type="button" id="restartButton">Перезапуск</button>
+            <button type="button" id="latestButton">Последний запуск</button>
+            <button type="button" id="injectButton">Внести событие</button>
+          </div>
+        </section>
+
+        <section class="settings-stack" data-panel="simple">
+          <section class="panel-section">
+            <div class="section-heading">Быстрые настройки</div>
+            <label class="control-group">
+              <span>Режим</span>
+              <select id="modeSelect">
+                <option value="baseline">Базовый</option>
+                <option value="fixed">Фиксированный</option>
+                <option value="adaptive">Адаптивный</option>
+                <option value="hybrid">Гибридный</option>
+              </select>
+            </label>
+
+            <label class="control-group">
+              <span>Профиль</span>
+              <select id="profileSelect">
+                <option value="demo">Демо</option>
+                <option value="realistic">Реалистичный</option>
+                <option value="stress">Стресс</option>
+              </select>
+            </label>
+
+            <label class="control-group">
+              <span>Сущности <strong id="entitiesValue">180</strong></span>
+              <input id="entitiesRange" type="range" min="60" max="600" step="20" value="180" />
+            </label>
+
+            <label class="control-group">
+              <span>Скорость <strong id="speedValue">1.2x</strong></span>
+              <input id="speedRange" type="range" min="0.25" max="4" step="0.05" value="1.2" />
+            </label>
+
+            <div class="inline-note">
+              Клик по полю может внедрить событие, если инструмент <em>Внести событие</em>
+              активирован. Такое внедрение перезапускает бэкенд с текущего шага проигрывания и
+              обновлёнными координатами события.
+            </div>
+          </section>
+        </section>
+
+        <section class="settings-stack hidden" data-panel="advanced">
+          <section class="panel-section">
+            <div class="section-heading">Параметры запуска</div>
+            <label class="control-group">
+              <span>Сценарий</span>
+              <select id="scenarioSelect"></select>
+            </label>
+
+            <label class="control-group">
+              <span>Шаги <strong id="stepsValue">10</strong></span>
+              <input id="stepsRange" type="range" min="3" max="30" step="1" value="10" />
+            </label>
+
+            <label class="control-group">
+              <span>Сид</span>
+              <input id="seedInput" type="number" value="123" min="1" step="1" />
+            </label>
+
+            <label class="control-group">
+              <span>Лимит видимых сущностей</span>
+              <input id="entityLimitInput" type="number" value="400" min="50" max="2000" step="10" />
+            </label>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-heading">Параметры события</div>
+            <label class="control-group">
+              <span>Интенсивность <strong id="eventIntensityValue">0.88</strong></span>
+              <input id="eventIntensityRange" type="range" min="0" max="1" step="0.01" value="0.88" />
+            </label>
+
+            <label class="control-group">
+              <span>Релевантность <strong id="eventRelevanceValue">0.92</strong></span>
+              <input id="eventRelevanceRange" type="range" min="0" max="1" step="0.01" value="0.92" />
+            </label>
+
+            <label class="control-group">
+              <span>Охват <strong id="eventScopeValue">0.82</strong></span>
+              <input id="eventScopeRange" type="range" min="0" max="1" step="0.01" value="0.82" />
+            </label>
+
+            <div class="grid-two">
+              <label class="control-group">
+                <span>Шаг старта</span>
+                <input id="eventStartStepInput" type="number" min="1" max="50" value="1" />
+              </label>
+
+              <label class="control-group">
+                <span>Длительность</span>
+                <input id="eventDurationInput" type="number" min="1" max="50" value="4" />
+              </label>
+            </div>
+
+            <div class="grid-two">
+              <label class="control-group">
+                <span>Событие X</span>
+                <input id="eventXInput" type="number" min="0" max="1" step="0.01" value="0.82" />
+              </label>
+
+              <label class="control-group">
+                <span>Событие Y</span>
+                <input id="eventYInput" type="number" min="0" max="1" step="0.01" value="0.78" />
+              </label>
+            </div>
+
+            <div class="button-row">
+              <button type="button" id="centerEventButton">Событие в центр</button>
+              <button type="button" id="randomEventButton">Случайное событие</button>
+          </div>
+        </section>
+
+        <section class="panel-section">
+            <div class="section-heading">Рендер и отладка</div>
+            <div class="check-grid">
+              <label><input id="showLinksToggle" type="checkbox" checked /> Связи</label>
+              <label><input id="showTrailsToggle" type="checkbox" /> Шлейфы</label>
+              <label><input id="showLabelsToggle" type="checkbox" /> Подписи</label>
+              <label><input id="showIdsToggle" type="checkbox" /> ID сущностей</label>
+              <label><input id="showEventAuraToggle" type="checkbox" checked /> Аура события</label>
+              <label><input id="showClusterRingToggle" type="checkbox" checked /> Кластерное кольцо</label>
+              <label><input id="showResidualToggle" type="checkbox" checked /> Остаточные следы</label>
+              <label><input id="showVelocityToggle" type="checkbox" /> Векторы скорости</label>
+              <label><input id="loopToggle" type="checkbox" /> Зациклить проигрывание</label>
+              <label><input id="armInjectToggle" type="checkbox" /> Активировать клик по полю</label>
+            </div>
+
+            <label class="control-group">
+              <span>Дистанция связей <strong id="linkDistanceValue">0.16</strong></span>
+              <input id="linkDistanceRange" type="range" min="0.04" max="0.3" step="0.01" value="0.16" />
+            </label>
+
+            <label class="control-group">
+              <span>Масштаб узлов <strong id="nodeScaleValue">1.00</strong></span>
+              <input id="nodeScaleRange" type="range" min="0.6" max="2" step="0.05" value="1" />
+            </label>
+
+            <div class="button-row">
+              <button type="button" id="stepBackButton">Шаг -1</button>
+              <button type="button" id="stepForwardButton">Шаг +1</button>
+            </div>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-heading">Параметры профиля бэкенда</div>
+            <div class="profile-hint-card" id="profileHintCard"></div>
+          </section>
+        </section>
+
+        <section class="panel-section panel-error hidden" id="errorPanel"></section>
+      </aside>
+
+      <section class="stats-overlay" id="statsOverlay">
+        <div class="overlay-title-row">
+          <div>
+            <div class="overlay-title">Телеметрия запуска</div>
+            <div class="overlay-subtitle" id="overlaySubtitle">Нет активного запуска</div>
+          </div>
+          <div class="tiny-status" id="playbackStatus">ожидание</div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span>Шаг</span>
+            <strong id="statStep">0 / 0</strong>
+          </div>
+          <div class="stat-card">
+            <span>Хаос</span>
+            <strong id="statChaos">0.00</strong>
+          </div>
+          <div class="stat-card">
+            <span>Ср. температура</span>
+            <strong id="statTemp">0.00</strong>
+          </div>
+          <div class="stat-card">
+            <span>Ср. риск</span>
+            <strong id="statRisk">0.00</strong>
+          </div>
+          <div class="stat-card">
+            <span>Сбой</span>
+            <strong id="statFailure">0.00</strong>
+          </div>
+          <div class="stat-card">
+            <span>Порог</span>
+            <strong id="statThreshold">0.00</strong>
+          </div>
+          <div class="stat-card">
+            <span>Системное действие</span>
+            <strong id="statAction">система в норме</strong>
+          </div>
+          <div class="stat-card">
+            <span>Доля горячих</span>
+            <strong id="statHotShare">0%</strong>
+          </div>
+        </div>
+
+        <div class="telemetry-stack">
+          <div class="telemetry-heading">Текущий шаг</div>
+          <div class="telemetry-row">
+            <span>Текущее / остаточное влияние</span>
+            <strong id="telemetryInfluence">0.00 / 0.00</strong>
+          </div>
+          <div class="telemetry-row">
+            <span>Текущая / остаточная скорость</span>
+            <strong id="telemetryVelocity">0.00 / 0.00</strong>
+          </div>
+          <div class="telemetry-row">
+            <span>Завершено / стабилизировано / провалено</span>
+            <strong id="telemetryTerminal">0 / 0 / 0</strong>
+          </div>
+          <div class="telemetry-row">
+            <span>Фаза события / интенсивность</span>
+            <strong id="telemetryEvent">неактивно / 0.00</strong>
+          </div>
+        </div>
+
+        <div class="telemetry-stack telemetry-stack-summary">
+          <div class="telemetry-heading">Сводка запуска</div>
+          <div class="telemetry-row">
+            <span>Завершено / стабилизировано / провалено</span>
+            <strong id="summaryTerminal">0 / 0 / 0</strong>
+          </div>
+          <div class="telemetry-row">
+            <span>Всего / наблюдать / уведомить / подавить</span>
+            <strong id="summaryActions">0 / 0 / 0 / 0</strong>
+          </div>
+          <div class="telemetry-row">
+            <span>Финал / пик / средний хаос</span>
+            <strong id="summaryChaos">0.00 / 0.00 / 0.00</strong>
+          </div>
+          <div class="telemetry-row">
+            <span>Финал / активные / пик горячих</span>
+            <strong id="summaryHot">0 / 0 / 0</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="timeline-panel" id="timelinePanel">
+        <div class="timeline-head">
+          <div>
+            <div class="timeline-title">Проигрывание таймлайна</div>
+            <div class="timeline-subtitle" id="timelineSubtitle">
+              Локальное проигрывание запуска бэкенда с интерполяцией
+            </div>
+          </div>
+          <div class="timeline-meta" id="timelineMeta">сид ---</div>
+        </div>
+
+        <input id="timelineScrubber" type="range" min="1" max="10" step="0.01" value="1" />
+
+        <div class="timeline-foot">
+          <span id="timelineStartLabel">шаг 1</span>
+          <span id="timelineCenterLabel">пауза</span>
+          <span id="timelineEndLabel">шаг 10</span>
+        </div>
+      </section>
+
+      <div class="floating-hint" id="floatingHint">
+        Кликните по полю, чтобы внедрить событие, когда инструмент активирован.
+      </div>
+    </div>
+
+    <script type="module" src="./app/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "front-simulation",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  }
+}
