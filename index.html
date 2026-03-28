@@ -11,12 +11,17 @@
     <div class="app-shell">
       <canvas id="simulation-canvas" aria-label="Поле визуализации симуляции"></canvas>
 
+      <button type="button" class="panel-toggle-button" id="panelToggleButton">Панель</button>
+
       <aside class="control-panel" id="controlPanel">
         <div class="panel-topbar">
           <div>
             <div class="panel-title">Панель управления</div>
             <div class="panel-subtitle" id="backendStatusText">Бэкенд: подключение...</div>
           </div>
+          <button type="button" class="panel-collapse-inline" id="panelCollapseInlineButton">
+            Скрыть
+          </button>
           <div class="status-pill" id="backendStatusPill">...</div>
         </div>
 

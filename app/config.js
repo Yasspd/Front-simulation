@@ -81,6 +81,7 @@ export const DEFAULT_CONFIG = {
   },
   ui: {
     settingsLevel: 'simple',
+    panelCollapsed: false,
   },
   render: {
     showLinks: true,

@@ -11,6 +11,16 @@ import { TimelinePanel } from './ui/timeline-panel.js';
 const store = new SessionStore();
 store.update(structuredClone(INITIAL_APP_STATE));
 
+if (window.matchMedia('(max-width: 900px)').matches) {
+  store.update({
+    config: {
+      ui: {
+        panelCollapsed: true,
+      },
+    },
+  });
+}
+
 const session = new SimulationSession(store, new SimulationApiClient());
 const renderer = new CanvasRenderer(document.getElementById('simulation-canvas'), (coordinates) => {
   if (!store.getState().config.render.armInject) {

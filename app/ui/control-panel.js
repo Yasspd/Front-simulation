@@ -10,6 +10,7 @@ export class ControlPanel {
     this.root = root;
     this.store = store;
     this.session = session;
+    this.shell = document.querySelector('.app-shell');
     this.elements = this.captureElements();
     this.bindEvents();
 
@@ -21,6 +22,8 @@ export class ControlPanel {
     return {
       backendStatusText: document.getElementById('backendStatusText'),
       backendStatusPill: document.getElementById('backendStatusPill'),
+      panelToggleButton: document.getElementById('panelToggleButton'),
+      panelCollapseInlineButton: document.getElementById('panelCollapseInlineButton'),
       floatingHint: document.getElementById('floatingHint'),
       errorPanel: document.getElementById('errorPanel'),
       modeChips: this.root.querySelectorAll('[data-settings-level]'),
@@ -75,6 +78,13 @@ export class ControlPanel {
   }
 
   bindEvents() {
+    this.elements.panelToggleButton.addEventListener('click', () => {
+      this.togglePanel();
+    });
+    this.elements.panelCollapseInlineButton.addEventListener('click', () => {
+      this.collapsePanel();
+    });
+
     this.elements.modeChips.forEach((button) => {
       button.addEventListener('click', () => {
         this.session.updateConfig({
@@ -115,6 +125,7 @@ export class ControlPanel {
 
     this.elements.startButton.addEventListener('click', () => {
       this.session.startSimulation();
+      this.collapsePanelForPlayback();
     });
     this.elements.pauseButton.addEventListener('click', () => {
       this.session.togglePause();
@@ -124,9 +135,11 @@ export class ControlPanel {
     });
     this.elements.restartButton.addEventListener('click', () => {
       this.session.restartSimulation();
+      this.collapsePanelForPlayback();
     });
     this.elements.latestButton.addEventListener('click', () => {
       this.session.loadLatestRun();
+      this.collapsePanelForPlayback();
     });
     this.elements.injectButton.addEventListener('click', () => {
       this.session.updateConfig({
@@ -137,9 +150,11 @@ export class ControlPanel {
     });
     this.elements.centerEventButton.addEventListener('click', () => {
       this.session.injectEventAt({ x: 0.5, y: 0.5 });
+      this.collapsePanelForPlayback();
     });
     this.elements.randomEventButton.addEventListener('click', () => {
       this.session.injectEventAt({ x: 0.5, y: 0.5 }, true);
+      this.collapsePanelForPlayback();
     });
     this.elements.stepBackButton.addEventListener('click', () => {
       this.session.stepBy(-1);
@@ -219,14 +234,60 @@ export class ControlPanel {
     });
   }
 
+  shouldUseCompactDrawer() {
+    return window.matchMedia('(max-width: 900px)').matches;
+  }
+
+  togglePanel() {
+    const isCollapsed = this.store.getState().config.ui.panelCollapsed;
+
+    this.session.updateConfig({
+      ui: {
+        panelCollapsed: !isCollapsed,
+      },
+    });
+  }
+
+  collapsePanel() {
+    this.session.updateConfig({
+      ui: {
+        panelCollapsed: true,
+      },
+    });
+  }
+
+  collapsePanelForPlayback() {
+    if (!this.shouldUseCompactDrawer()) {
+      return;
+    }
+
+    this.collapsePanel();
+  }
+
   render() {
     const state = this.store.getState();
     const playback = this.session.getPlaybackState();
     const { config } = state;
 
+    if (!this.shouldUseCompactDrawer() && config.ui.panelCollapsed) {
+      this.session.updateConfig({
+        ui: {
+          panelCollapsed: false,
+        },
+      });
+      return;
+    }
+
     this.elements.backendStatusText.textContent = humanizeBackendStatus(state.backendStatus);
     this.elements.backendStatusPill.textContent = humanizeBackendStatusShort(state.backendStatus);
     this.elements.backendStatusPill.dataset.status = state.backendStatus;
+    this.root.classList.toggle('is-collapsed', config.ui.panelCollapsed);
+    this.shell?.classList.toggle('panel-collapsed', config.ui.panelCollapsed);
+    this.elements.panelToggleButton.dataset.collapsed = String(config.ui.panelCollapsed);
+    this.elements.panelToggleButton.textContent = config.ui.panelCollapsed
+      ? 'Панель'
+      : 'Скрыть';
+    this.elements.panelCollapseInlineButton.textContent = 'Скрыть';
 
     this.elements.modeChips.forEach((button) => {
       button.classList.toggle('active', button.dataset.settingsLevel === config.ui.settingsLevel);
@@ -344,8 +405,8 @@ export class ControlPanel {
     this.elements.randomEventButton.disabled = backendLocked;
     this.elements.injectButton.classList.toggle('primary-button', injectArmed);
     this.elements.floatingHint.textContent = injectArmed
-      ? 'Режим внедрения активирован. Клик по полю перезапустит бэкенд с текущего шага проигрывания.'
-      : 'Проигрывание выполняется локально и мгновенно. Используйте внедрение события, чтобы перезапустить бэкенд с новым активным событием.';
+      ? 'Режим внедрения активирован. Короткое нажатие по полю перезапустит бэкенд с текущего шага, а перетаскивание продолжит двигать камеру.'
+      : 'Поле можно перетаскивать мышью или пальцем. Колесо мыши и щипок двумя пальцами меняют масштаб.';
   }
 
   renderError(error) {
