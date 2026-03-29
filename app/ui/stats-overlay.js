@@ -4,6 +4,7 @@ import {
   humanizeEventPhase,
   humanizeMode,
   humanizePlaybackStatus,
+  humanizePolicyId,
   humanizeProfile,
   humanizeSystemAction,
 } from '../utils/formatters.js';
@@ -13,6 +14,7 @@ export class StatsOverlay {
     this.elements = {
       overlaySubtitle: document.getElementById('overlaySubtitle'),
       playbackStatus: document.getElementById('playbackStatus'),
+      analysisBadgeRow: document.getElementById('analysisBadgeRow'),
       statStep: document.getElementById('statStep'),
       statChaos: document.getElementById('statChaos'),
       statTemp: document.getElementById('statTemp'),
@@ -34,6 +36,7 @@ export class StatsOverlay {
 
   reset() {
     this.elements.overlaySubtitle.textContent = 'Нет активного запуска';
+    this.elements.analysisBadgeRow.innerHTML = '';
     this.elements.statStep.textContent = '0 / 0';
     this.elements.statChaos.textContent = '0.00';
     this.elements.statTemp.textContent = '0.00';
@@ -75,10 +78,24 @@ export class StatsOverlay {
     const step = playbackSnapshot.interpolatedStep;
     const currentStep = playbackSnapshot.currentStep;
     const summary = viewState.run.summary;
+    const robust = viewState.run.analysis?.robust;
+    const uncertainty = viewState.run.analysis?.uncertainty;
+    const analysisBadges = [
+      `<span class="analysis-pill">${viewState.run.analysis ? 'analysis on' : 'analysis off'}</span>`,
+      robust?.recommendedPolicy
+        ? `<span class="analysis-pill analysis-pill-strong">policy ${humanizePolicyId(robust.recommendedPolicy.policyId)}</span>`
+        : '',
+      uncertainty
+        ? '<span class="analysis-pill">intervals active</span>'
+        : '',
+    ]
+      .filter(Boolean)
+      .join('');
     const eventLabel = playbackSnapshot.event
       ? `${humanizeEventPhase(playbackSnapshot.event.phase)} / ${formatDecimal(step.activeEventIntensity, 2)}`
       : 'неактивно / 0.00';
 
+    this.elements.analysisBadgeRow.innerHTML = analysisBadges;
     this.elements.overlaySubtitle.textContent = `${humanizeMode(viewState.run.mode)} / ${humanizeProfile(viewState.run.profile)} / ${viewState.run.runId.slice(0, 8)}`;
     this.elements.statStep.textContent = `${formatDecimal(playback.currentStepFloat, 1)} / ${viewState.run.requestedSteps}`;
     this.elements.statChaos.textContent = formatDecimal(step.chaosIndex, 3);

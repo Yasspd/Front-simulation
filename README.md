@@ -1,74 +1,65 @@
 # Front Simulation
 
-Фронтенд-визуализация для существующего backend-проекта `business_model`.
+Фронтенд-визуализация для backend-проекта `business _model`.
 
-Этот проект не реализует второй движок симуляции в браузере. Он использует timeline запуска,
-который возвращает backend через `POST /simulation/run`, а затем локально проигрывает его на
-canvas с интерполяцией между шагами. Это упрощает стек и делает визуализацию честно связанной с
-реальным движком.
+Это не второй движок симуляции в браузере. Фронт запускает backend run, получает полный timeline и затем локально проигрывает его на canvas с интерполяцией между шагами.
 
-## Что делает проект
+## Что умеет интерфейс
 
-- рисует сущности на полноэкранном canvas в тёмном neon/control-room стиле
-- запускает backend-симуляции и проигрывает возвращённый run в реальном времени
-- поддерживает режимы `baseline`, `fixed`, `adaptive`, `hybrid`
-- поддерживает профили `demo`, `realistic`, `stress`
-- даёт простой режим для демо и расширенный режим для технического контроля
-- позволяет внедрять событие во время проигрывания через повторный запуск backend с обновлённым
-  `activeEventOverride`
+- fullscreen canvas в тёмном neon/glass стиле
+- запуск backend simulation
+- local playback: пуск, пауза, сброс, scrubber, шаг назад/вперёд
+- injection события в текущий playback-step
+- analysis controls для `causal`, `robust`, `uncertainty`
+- analysis / decision panel
+- runs browser для последних запусков и загрузки `latest`
 
 ## Архитектура
 
-Фронтенд специально оставлен простым:
-
-- `server.js`
-  статический сервер и прокси `/api/*` к NestJS backend
 - `app/api/simulation-api.js`
   HTTP transport layer
 - `app/state/session-store.js`
   маленькое хранилище состояния
 - `app/session/simulation-session.js`
-  менеджер сессии симуляции и playback-контроля
+  session manager, backend requests, playback state, recent runs
 - `app/session/playback-selectors.js`
-  преобразует backend run в интерполированные playback-snapshot'ы
+  строит interpolated playback snapshot
 - `app/renderer/canvas-renderer.js`
-  отвечает только за canvas-отрисовку
-- `app/ui/*`
-  панель управления, telemetry overlay и timeline
+  отвечает только за canvas rendering и camera controls
+- `app/ui/control-panel.js`
+  параметры запуска, analysis controls, runs browser
+- `app/ui/stats-overlay.js`
+  compact telemetry HUD
+- `app/ui/analysis-panel.js`
+  robust / causal / uncertainty explanation layer
+- `app/ui/timeline-panel.js`
+  local playback timeline
 
-## Почему без WebSocket
+## Backend contract
 
-Текущий backend уже возвращает полный timeline запуска. Для первой реально рабочей версии
-HTTP + локальное проигрывание проще и поддерживаемее, чем отдельный live-session протокол.
-
-Текущая семантика:
-
-- `Пуск` и `Перезапуск` создают новый backend-run
-- `Пауза` и `Продолжить` управляют только локальным проигрыванием
-- `Сброс` возвращает локальный playback к шагу `1`, не удаляя загруженный run
-- `Внести событие` повторно запускает backend с новыми координатами события и продолжает
-  проигрывание от текущего step-window
-
-## Используемый backend-контракт
-
-Ожидаемые backend-endpoint'ы:
+Фронт ожидает backend endpoints:
 
 - `GET /simulation/scenarios`
 - `GET /simulation/latest`
+- `GET /simulation/runs`
+- `GET /simulation/runs/:runId`
 - `POST /simulation/run`
 
-Во фронте они доступны как:
+`analysisOptions` отправляются только если пользователь их включил. Без analysis flags backend вызывается как раньше.
 
-- `/api/simulation/scenarios`
-- `/api/simulation/latest`
-- `/api/simulation/run`
+## Как запускать локально
 
-## Как запустить
-
-1. Сначала поднимите backend-проект.
-2. Затем запустите этот фронтенд:
+Backend:
 
 ```bash
+cd "d:\It_package\Project\business _model"
+npm run start:dev
+```
+
+Frontend:
+
+```bash
+cd "d:\It_package\Project\Front-simulation"
 node server.js
 ```
 
@@ -78,52 +69,22 @@ node server.js
 npm start
 ```
 
-URL фронтенда по умолчанию:
+По умолчанию фронт открывается на:
 
 ```text
 http://127.0.0.1:4173
 ```
 
-Backend origin по умолчанию:
+Backend origin берётся из:
 
-```text
-http://127.0.0.1:3000
-```
+- `window.__SIMULATION_BACKEND_ORIGIN__`
+- или `<meta name="simulation-backend-origin" ...>`
 
-При необходимости можно переопределить:
+Для static deploy достаточно выставить backend URL в `index.html`.
 
-```bash
-$env:BACKEND_ORIGIN="http://127.0.0.1:3000"
-node server.js
-```
+## Честная semantics UI
 
-## Основные элементы управления
-
-### Простой режим
-
-- режим
-- профиль
-- число сущностей
-- скорость проигрывания
-- пуск / пауза / сброс
-- внедрение события
-
-### Расширенный режим
-
-- сценарий
-- число шагов
-- seed
-- лимит видимых сущностей
-- интенсивность / релевантность / охват / тайминг / позиция события
-- render-тумблеры
-- зацикливание проигрывания
-- шаговое перемещение по timeline
-- подсказки по профилю backend и live config snapshot
-
-## Важные ограничения
-
-- Настоящей backend-streaming session пока нет. Real-time playback строится на уже завершённом
-  backend-run.
-- Расширенные контролы показывают только то, что реально поддерживает текущий backend API.
-- Пороги, охлаждение, отложенные эффекты и stress-memory сейчас управляются логикой backend-профиля,
-  а не публичными override-полями.
+- recommendation — это `simulation recommendation`, а не real-world guarantee
+- causal panel — это `interventional estimate inside model`, а не external causal proof
+- uncertainty — это `empirical interval` / `seeded simulation spread`, а не strict confidence proof
+- analysis panel не меняет raw simulation result, а только объясняет уже построенный run

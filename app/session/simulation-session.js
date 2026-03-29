@@ -3,6 +3,7 @@ import { clamp, pickDefinedValues } from '../utils/formatters.js';
 
 const DEFAULT_RATE_LIMIT_DELAY_MS = 5000;
 const MAX_RATE_LIMIT_DELAY_MS = 15000;
+const DEFAULT_RUNS_LIMIT = 8;
 
 export class SimulationSession {
   constructor(store, apiClient) {
@@ -122,9 +123,7 @@ export class SimulationSession {
     const retryAfterMs = Math.min(MAX_RATE_LIMIT_DELAY_MS, retryAfterMsRaw);
     const retryAfterSeconds = Math.ceil(retryAfterMs / 1000);
     const details =
-      error instanceof Error && error.message
-        ? error.message
-        : fallbackMessage;
+      error instanceof Error && error.message ? error.message : fallbackMessage;
     const userMessage = `Слишком много запросов. Повторите через ${retryAfterSeconds} сек. ${details}`.trim();
 
     console.warn('[simulation-session] rate limited', {
@@ -226,8 +225,22 @@ export class SimulationSession {
 
       this.store.update({
         backendStatus: 'offline',
-        error: error instanceof Error ? error.message : 'Не удалось связаться с бэкендом',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Не удалось связаться с бэкендом',
       });
+      return;
+    }
+
+    try {
+      const recentRuns = await this.apiClient.listRuns(DEFAULT_RUNS_LIMIT);
+
+      this.store.update({
+        recentRuns,
+      });
+    } catch (error) {
+      console.warn('[simulation-session] failed to preload recent runs', error);
     }
   }
 
@@ -267,6 +280,7 @@ export class SimulationSession {
         run,
         backendStatus: 'online',
         error: '',
+        recentRuns: this.mergeRecentRuns([this.toRunListItem(run)]),
       });
 
       this.finishRequest({
@@ -278,6 +292,61 @@ export class SimulationSession {
       });
     } catch (error) {
       this.handleRequestError(error, 'Не удалось загрузить последний запуск');
+    }
+  }
+
+  async loadRecentRuns(limit = DEFAULT_RUNS_LIMIT) {
+    if (!this.canStartBackendRequest('runs')) {
+      return;
+    }
+
+    this.beginRequest('runs');
+
+    try {
+      const recentRuns = await this.apiClient.listRuns(limit);
+
+      this.store.update({
+        recentRuns,
+        backendStatus: 'online',
+        error: '',
+      });
+
+      this.finishRequest({
+        isRunning: false,
+        isPaused: true,
+        lastFrameAt: 0,
+      });
+    } catch (error) {
+      this.handleRequestError(error, 'Не удалось загрузить историю запусков');
+    }
+  }
+
+  async loadRunById(runId) {
+    if (!runId || !this.canStartBackendRequest('runById')) {
+      return;
+    }
+
+    this.beginRequest('runById');
+
+    try {
+      const run = await this.apiClient.getRunById(runId);
+
+      this.store.update({
+        run,
+        backendStatus: 'online',
+        error: '',
+        recentRuns: this.mergeRecentRuns([this.toRunListItem(run)]),
+      });
+
+      this.finishRequest({
+        currentStepFloat: 1,
+        isRunning: true,
+        isPaused: false,
+        isCompleted: false,
+        lastFrameAt: 0,
+      });
+    } catch (error) {
+      this.handleRequestError(error, 'Не удалось загрузить выбранный запуск');
     }
   }
 
@@ -360,12 +429,14 @@ export class SimulationSession {
   }
 
   async injectEventAt(coordinates, randomize = false) {
-    if (!this.canStartBackendRequest('run')) {
+    if (!this.canStartBackendRequest('inject')) {
       return;
     }
 
     const run = this.store.getState().run;
-    const currentStep = run ? Math.max(1, Math.round(this.playback.currentStepFloat)) : 1;
+    const currentStep = run
+      ? Math.max(1, Math.round(this.playback.currentStepFloat))
+      : 1;
     const randomCoordinates = {
       x: Math.random() * 0.7 + 0.15,
       y: Math.random() * 0.7 + 0.15,
@@ -443,6 +514,7 @@ export class SimulationSession {
         run,
         backendStatus: 'online',
         error: '',
+        recentRuns: this.mergeRecentRuns([this.toRunListItem(run)]),
       });
 
       this.finishRequest({
@@ -465,8 +537,9 @@ export class SimulationSession {
       ...config.activeEventOverride,
       ...override,
     });
+    const analysisOptions = this.buildAnalysisOptionsPayload();
 
-    return {
+    return pickDefinedValues({
       scenarioKey: config.scenarioKey,
       mode: config.mode,
       profile: config.profile,
@@ -475,6 +548,73 @@ export class SimulationSession {
       seed: Number.isFinite(Number(config.seed)) ? Number(config.seed) : undefined,
       activeEventOverride,
       returnEntitiesLimit: Math.min(config.visibleEntityLimit, config.entitiesCount),
+      analysisOptions,
+    });
+  }
+
+  buildAnalysisOptionsPayload() {
+    const { analysisOptions } = this.store.getState().config;
+    const payload = {};
+
+    if (analysisOptions.causal.enabled) {
+      payload.causal = {
+        enabled: true,
+        targetMetric: analysisOptions.causal.targetMetric,
+        maxInterventions: Number(analysisOptions.causal.maxInterventions),
+      };
+    }
+
+    if (analysisOptions.robust.enabled) {
+      payload.robust = {
+        enabled: true,
+        objective: analysisOptions.robust.objective,
+        scenarioCount: Number(analysisOptions.robust.scenarioCount),
+      };
+    }
+
+    if (analysisOptions.uncertainty.enabled) {
+      payload.uncertainty = {
+        enabled: true,
+        level: Number(analysisOptions.uncertainty.level),
+        method: analysisOptions.uncertainty.method,
+        resamples: Number(analysisOptions.uncertainty.resamples),
+      };
+    }
+
+    return Object.keys(payload).length > 0 ? payload : undefined;
+  }
+
+  mergeRecentRuns(nextRuns) {
+    const merged = [...nextRuns, ...this.store.getState().recentRuns];
+    const deduped = [];
+    const seen = new Set();
+
+    for (const run of merged) {
+      if (!run || seen.has(run.runId)) {
+        continue;
+      }
+
+      seen.add(run.runId);
+      deduped.push(run);
+    }
+
+    return deduped.slice(0, DEFAULT_RUNS_LIMIT);
+  }
+
+  toRunListItem(run) {
+    return {
+      runId: run.runId,
+      startedAt: run.startedAt,
+      finishedAt: run.finishedAt,
+      status: run.status,
+      scenarioKey: run.scenarioKey,
+      mode: run.mode,
+      profile: run.profile,
+      seed: run.seed,
+      entitiesCount: run.entitiesCount,
+      requestedSteps: run.requestedSteps,
+      summary: structuredClone(run.summary),
+      lastStep: structuredClone(run.lastStep),
     };
   }
 

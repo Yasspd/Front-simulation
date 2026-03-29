@@ -35,7 +35,7 @@ export const PROFILE_HINTS = {
   demo: {
     title: 'Демо',
     summary:
-      'Консервативный профиль без seeded noise, жизненного цикла события и отложенных эффектов.',
+      'Консервативный профиль без сильного seeded noise, жизненного цикла события и тяжёлых отложенных эффектов.',
     details: [
       'Подходит для базовых демонстраций и предсказуемых скриншотов.',
       'Расхождение траектории может появиться раньше terminal-расхождения.',
@@ -59,6 +59,27 @@ export const PROFILE_HINTS = {
       'Рекомендуется для тестов и демонстраций хаоса.',
     ],
   },
+};
+
+export const ANALYSIS_TARGET_LABELS = {
+  failureRate: 'Failure rate',
+  finalChaosIndex: 'Финальный chaos index',
+  avgRiskScore: 'Средний risk score',
+  avgFailureProbability: 'Средняя failure probability',
+  stabilizedCount: 'Stabilized count',
+  failedCount: 'Failed count',
+};
+
+export const ROBUST_OBJECTIVE_LABELS = {
+  balanced_resilience: 'Сбалансированная устойчивость',
+  min_failure_rate: 'Минимум failure rate',
+  min_chaos_index: 'Минимум chaos index',
+  maximize_stabilization: 'Максимум stabilization',
+};
+
+export const UNCERTAINTY_METHOD_LABELS = {
+  calibrated_empirical_interval: 'Calibrated empirical interval',
+  empirical_seeded_interval: 'Empirical seeded interval',
 };
 
 export const DEFAULT_CONFIG = {
@@ -97,11 +118,30 @@ export const DEFAULT_CONFIG = {
     linkDistance: 0.16,
     nodeScale: 1,
   },
+  analysisOptions: {
+    causal: {
+      enabled: false,
+      targetMetric: 'failureRate',
+      maxInterventions: 4,
+    },
+    robust: {
+      enabled: false,
+      objective: 'balanced_resilience',
+      scenarioCount: 6,
+    },
+    uncertainty: {
+      enabled: false,
+      level: 0.95,
+      method: 'calibrated_empirical_interval',
+      resamples: 6,
+    },
+  },
 };
 
 export const INITIAL_APP_STATE = {
   scenarios: [],
   run: null,
+  recentRuns: [],
   error: '',
   backendStatus: 'connecting',
   config: structuredClone(DEFAULT_CONFIG),

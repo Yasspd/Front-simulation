@@ -1,4 +1,10 @@
-import { MODE_LABELS, PROFILE_LABELS } from '../config.js';
+import {
+  ANALYSIS_TARGET_LABELS,
+  MODE_LABELS,
+  PROFILE_LABELS,
+  ROBUST_OBJECTIVE_LABELS,
+  UNCERTAINTY_METHOD_LABELS,
+} from '../config.js';
 
 export function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -18,6 +24,18 @@ export function formatPercent(value, digits = 1) {
 
 export function formatStep(value) {
   return Number.isFinite(value) ? value.toFixed(2).replace(/\.00$/, '') : '0';
+}
+
+export function formatInteger(value) {
+  return Number.isFinite(value) ? String(Math.round(value)) : '0';
+}
+
+export function formatInterval(interval, digits = 3) {
+  if (!interval) {
+    return '—';
+  }
+
+  return `${formatDecimal(interval.lower, digits)} ... ${formatDecimal(interval.upper, digits)}`;
 }
 
 export function humanizeBackendStatus(status) {
@@ -66,6 +84,18 @@ export function humanizeMode(mode) {
 
 export function humanizeProfile(profile) {
   return PROFILE_LABELS[profile] ?? profile;
+}
+
+export function humanizeAnalysisTargetMetric(metric) {
+  return ANALYSIS_TARGET_LABELS[metric] ?? metric;
+}
+
+export function humanizeRobustObjective(objective) {
+  return ROBUST_OBJECTIVE_LABELS[objective] ?? objective;
+}
+
+export function humanizeUncertaintyMethod(method) {
+  return UNCERTAINTY_METHOD_LABELS[method] ?? method;
 }
 
 export function humanizePlaybackStatus(status) {
@@ -130,6 +160,46 @@ export function humanizeEventPhase(phase) {
   }
 
   return phase ?? 'неизвестно';
+}
+
+export function humanizeEffectDirection(direction) {
+  if (direction === 'increase') {
+    return '+';
+  }
+
+  if (direction === 'decrease') {
+    return '−';
+  }
+
+  return '0';
+}
+
+export function humanizeEffectStrengthLabel(label) {
+  if (label === 'large') {
+    return 'крупный эффект';
+  }
+
+  if (label === 'moderate') {
+    return 'умеренный эффект';
+  }
+
+  return 'слабый эффект';
+}
+
+export function humanizeEvidenceLabel(label) {
+  if (label === 'strong_single_seed_effect') {
+    return 'сильный single-seed эффект';
+  }
+
+  if (label === 'moderate_single_seed_effect') {
+    return 'умеренный single-seed эффект';
+  }
+
+  return 'слабый single-seed эффект';
+}
+
+export function humanizePolicyId(policyId) {
+  return humanizeMode(policyId);
 }
 
 export function mergePlain(target, patch) {

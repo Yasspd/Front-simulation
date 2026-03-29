@@ -3,30 +3,52 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="simulation-backend-origin" content="https://simulation-backend-hm9p.onrender.com" />
+    <meta
+      name="simulation-backend-origin"
+      content="https://simulation-backend-hm9p.onrender.com"
+    />
     <title>Панель телеметрии симуляции</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
     <div class="app-shell">
-      <canvas id="simulation-canvas" aria-label="Поле визуализации симуляции"></canvas>
+      <canvas
+        id="simulation-canvas"
+        aria-label="Поле визуализации симуляции"
+      ></canvas>
 
-      <button type="button" class="panel-toggle-button" id="panelToggleButton">Панель</button>
+      <button
+        type="button"
+        class="panel-toggle-button"
+        id="panelToggleButton"
+      >
+        Панель
+      </button>
 
       <aside class="control-panel" id="controlPanel">
         <div class="panel-topbar">
           <div>
             <div class="panel-title">Панель управления</div>
-            <div class="panel-subtitle" id="backendStatusText">Бэкенд: подключение...</div>
+            <div class="panel-subtitle" id="backendStatusText">
+              Бэкенд: подключение...
+            </div>
           </div>
-          <button type="button" class="panel-collapse-inline" id="panelCollapseInlineButton">
+          <button
+            type="button"
+            class="panel-collapse-inline"
+            id="panelCollapseInlineButton"
+          >
             Скрыть
           </button>
           <div class="status-pill" id="backendStatusPill">...</div>
         </div>
 
         <div class="mode-toggle">
-          <button type="button" class="mode-chip active" data-settings-level="simple">
+          <button
+            type="button"
+            class="mode-chip active"
+            data-settings-level="simple"
+          >
             ПРОСТОЙ
           </button>
           <button type="button" class="mode-chip" data-settings-level="advanced">
@@ -37,13 +59,15 @@
         <section class="panel-section">
           <div class="section-heading">Управление запуском</div>
           <div class="button-row button-row-main">
-            <button type="button" id="startButton" class="primary-button">Пуск</button>
+            <button type="button" id="startButton" class="primary-button">
+              Пуск
+            </button>
             <button type="button" id="pauseButton">Пауза</button>
             <button type="button" id="resetButton">Сброс</button>
           </div>
           <div class="button-row">
             <button type="button" id="restartButton">Перезапуск</button>
-            <button type="button" id="latestButton">Последний запуск</button>
+            <button type="button" id="latestButton">Load latest</button>
             <button type="button" id="injectButton">Внести событие</button>
           </div>
         </section>
@@ -72,18 +96,33 @@
 
             <label class="control-group">
               <span>Сущности <strong id="entitiesValue">180</strong></span>
-              <input id="entitiesRange" type="range" min="60" max="600" step="20" value="180" />
+              <input
+                id="entitiesRange"
+                type="range"
+                min="60"
+                max="600"
+                step="20"
+                value="180"
+              />
             </label>
 
             <label class="control-group">
               <span>Скорость <strong id="speedValue">1.2x</strong></span>
-              <input id="speedRange" type="range" min="0.25" max="4" step="0.05" value="1.2" />
+              <input
+                id="speedRange"
+                type="range"
+                min="0.25"
+                max="4"
+                step="0.05"
+                value="1.2"
+              />
             </label>
 
             <div class="inline-note">
-              Клик по полю может внедрить событие, если инструмент <em>Внести событие</em>
-              активирован. Такое внедрение перезапускает бэкенд с текущего шага проигрывания и
-              обновлёнными координатами события.
+              Analysis — дополнительный слой. Он включается только по запросу и
+              не меняет raw simulation result. Для демо можно оставить его
+              выключенным, а для объяснения решений включать causal, robust и
+              uncertainty отдельно.
             </div>
           </section>
         </section>
@@ -98,7 +137,14 @@
 
             <label class="control-group">
               <span>Шаги <strong id="stepsValue">10</strong></span>
-              <input id="stepsRange" type="range" min="3" max="30" step="1" value="10" />
+              <input
+                id="stepsRange"
+                type="range"
+                min="3"
+                max="30"
+                step="1"
+                value="10"
+              />
             </label>
 
             <label class="control-group">
@@ -108,58 +154,245 @@
 
             <label class="control-group">
               <span>Лимит видимых сущностей</span>
-              <input id="entityLimitInput" type="number" value="400" min="50" max="2000" step="10" />
+              <input
+                id="entityLimitInput"
+                type="number"
+                value="400"
+                min="50"
+                max="2000"
+                step="10"
+              />
             </label>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-heading">Analysis options</div>
+            <div class="analysis-control-group">
+              <label class="toggle-line">
+                <input id="causalEnabledToggle" type="checkbox" />
+                <span>Causal analysis</span>
+              </label>
+              <label class="control-group">
+                <span>Target metric</span>
+                <select id="causalTargetSelect">
+                  <option value="failureRate">Failure rate</option>
+                  <option value="finalChaosIndex">Final chaos index</option>
+                  <option value="avgRiskScore">Avg risk score</option>
+                  <option value="avgFailureProbability">
+                    Avg failure probability
+                  </option>
+                  <option value="stabilizedCount">Stabilized count</option>
+                  <option value="failedCount">Failed count</option>
+                </select>
+              </label>
+              <label class="control-group">
+                <span>
+                  Max interventions
+                  <strong id="causalInterventionsValue">4</strong>
+                </span>
+                <input
+                  id="causalInterventionsRange"
+                  type="range"
+                  min="1"
+                  max="8"
+                  step="1"
+                  value="4"
+                />
+              </label>
+            </div>
+
+            <div class="analysis-control-group">
+              <label class="toggle-line">
+                <input id="robustEnabledToggle" type="checkbox" />
+                <span>Robust analysis</span>
+              </label>
+              <label class="control-group">
+                <span>Objective</span>
+                <select id="robustObjectiveSelect">
+                  <option value="balanced_resilience">
+                    Сбалансированная устойчивость
+                  </option>
+                  <option value="min_failure_rate">Минимум failure rate</option>
+                  <option value="min_chaos_index">Минимум chaos index</option>
+                  <option value="maximize_stabilization">
+                    Максимум stabilization
+                  </option>
+                </select>
+              </label>
+              <label class="control-group">
+                <span>
+                  Scenario count
+                  <strong id="robustScenarioCountValue">6</strong>
+                </span>
+                <input
+                  id="robustScenarioCountRange"
+                  type="range"
+                  min="1"
+                  max="12"
+                  step="1"
+                  value="6"
+                />
+              </label>
+            </div>
+
+            <div class="analysis-control-group">
+              <label class="toggle-line">
+                <input id="uncertaintyEnabledToggle" type="checkbox" />
+                <span>Uncertainty analysis</span>
+              </label>
+              <label class="control-group">
+                <span>Level</span>
+                <select id="uncertaintyLevelSelect">
+                  <option value="0.9">0.90</option>
+                  <option value="0.95" selected>0.95</option>
+                </select>
+              </label>
+              <label class="control-group">
+                <span>Method</span>
+                <select id="uncertaintyMethodSelect">
+                  <option value="calibrated_empirical_interval">
+                    Calibrated empirical interval
+                  </option>
+                  <option value="empirical_seeded_interval">
+                    Empirical seeded interval
+                  </option>
+                </select>
+              </label>
+              <label class="control-group">
+                <span>
+                  Resamples
+                  <strong id="uncertaintyResamplesValue">6</strong>
+                </span>
+                <input
+                  id="uncertaintyResamplesRange"
+                  type="range"
+                  min="4"
+                  max="24"
+                  step="1"
+                  value="6"
+                />
+              </label>
+            </div>
+
+            <div class="inline-note">
+              Analysis — это не обязательная часть запуска. Если флаги выключены,
+              backend вызывается как раньше. Если включены — добавляется только
+              extension block <code>response.analysis</code>.
+            </div>
           </section>
 
           <section class="panel-section">
             <div class="section-heading">Параметры события</div>
             <label class="control-group">
-              <span>Интенсивность <strong id="eventIntensityValue">0.88</strong></span>
-              <input id="eventIntensityRange" type="range" min="0" max="1" step="0.01" value="0.88" />
+              <span>
+                Интенсивность <strong id="eventIntensityValue">0.88</strong>
+              </span>
+              <input
+                id="eventIntensityRange"
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value="0.88"
+              />
             </label>
 
             <label class="control-group">
-              <span>Релевантность <strong id="eventRelevanceValue">0.92</strong></span>
-              <input id="eventRelevanceRange" type="range" min="0" max="1" step="0.01" value="0.92" />
+              <span>
+                Релевантность <strong id="eventRelevanceValue">0.92</strong>
+              </span>
+              <input
+                id="eventRelevanceRange"
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value="0.92"
+              />
             </label>
 
             <label class="control-group">
               <span>Охват <strong id="eventScopeValue">0.82</strong></span>
-              <input id="eventScopeRange" type="range" min="0" max="1" step="0.01" value="0.82" />
+              <input
+                id="eventScopeRange"
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value="0.82"
+              />
             </label>
 
             <div class="grid-two">
               <label class="control-group">
                 <span>Шаг старта</span>
-                <input id="eventStartStepInput" type="number" min="1" max="50" value="1" />
+                <input
+                  id="eventStartStepInput"
+                  type="number"
+                  min="1"
+                  max="50"
+                  value="1"
+                />
               </label>
 
               <label class="control-group">
                 <span>Длительность</span>
-                <input id="eventDurationInput" type="number" min="1" max="50" value="4" />
+                <input
+                  id="eventDurationInput"
+                  type="number"
+                  min="1"
+                  max="50"
+                  value="4"
+                />
               </label>
             </div>
 
             <div class="grid-two">
               <label class="control-group">
                 <span>Событие X</span>
-                <input id="eventXInput" type="number" min="0" max="1" step="0.01" value="0.5" />
+                <input
+                  id="eventXInput"
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value="0.5"
+                />
               </label>
 
               <label class="control-group">
                 <span>Событие Y</span>
-                <input id="eventYInput" type="number" min="0" max="1" step="0.01" value="0.5" />
+                <input
+                  id="eventYInput"
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value="0.5"
+                />
               </label>
             </div>
 
             <div class="button-row">
-              <button type="button" id="centerEventButton">Событие в центр</button>
-              <button type="button" id="randomEventButton">Случайное событие</button>
-          </div>
-        </section>
+              <button type="button" id="centerEventButton">
+                Событие в центр
+              </button>
+              <button type="button" id="randomEventButton">
+                Случайное событие
+              </button>
+            </div>
+          </section>
 
-        <section class="panel-section">
+          <section class="panel-section">
+            <div class="section-heading">История запусков</div>
+            <div class="button-row button-row-main">
+              <button type="button" id="refreshRunsButton">Обновить список</button>
+            </div>
+            <div class="inline-note" id="recentRunsMeta">история пока пуста</div>
+            <div class="recent-runs-list" id="recentRunsList"></div>
+          </section>
+
+          <section class="panel-section">
             <div class="section-heading">Рендер и отладка</div>
             <div class="check-grid">
               <label><input id="showLinksToggle" type="checkbox" checked /> Связи</label>
@@ -175,13 +408,31 @@
             </div>
 
             <label class="control-group">
-              <span>Дистанция связей <strong id="linkDistanceValue">0.16</strong></span>
-              <input id="linkDistanceRange" type="range" min="0.04" max="0.3" step="0.01" value="0.16" />
+              <span>
+                Дистанция связей <strong id="linkDistanceValue">0.16</strong>
+              </span>
+              <input
+                id="linkDistanceRange"
+                type="range"
+                min="0.04"
+                max="0.3"
+                step="0.01"
+                value="0.16"
+              />
             </label>
 
             <label class="control-group">
-              <span>Масштаб узлов <strong id="nodeScaleValue">1.00</strong></span>
-              <input id="nodeScaleRange" type="range" min="0.6" max="2" step="0.05" value="1" />
+              <span>
+                Масштаб узлов <strong id="nodeScaleValue">1.00</strong>
+              </span>
+              <input
+                id="nodeScaleRange"
+                type="range"
+                min="0.6"
+                max="2"
+                step="0.05"
+                value="1"
+              />
             </label>
 
             <div class="button-row">
@@ -203,7 +454,10 @@
         <div class="overlay-title-row">
           <div>
             <div class="overlay-title">Телеметрия запуска</div>
-            <div class="overlay-subtitle" id="overlaySubtitle">Нет активного запуска</div>
+            <div class="overlay-subtitle" id="overlaySubtitle">
+              Нет активного запуска
+            </div>
+            <div class="analysis-badge-row" id="analysisBadgeRow"></div>
           </div>
           <div class="tiny-status" id="playbackStatus">ожидание</div>
         </div>
@@ -284,6 +538,8 @@
         </div>
       </section>
 
+      <section class="analysis-panel hidden" id="analysisPanel"></section>
+
       <section class="timeline-panel" id="timelinePanel">
         <div class="timeline-head">
           <div>
@@ -292,10 +548,17 @@
               Локальное проигрывание запуска бэкенда с интерполяцией
             </div>
           </div>
-          <div class="timeline-meta" id="timelineMeta">сид ---</div>
+          <div class="timeline-meta" id="timelineMeta">seed ---</div>
         </div>
 
-        <input id="timelineScrubber" type="range" min="1" max="10" step="0.01" value="1" />
+        <input
+          id="timelineScrubber"
+          type="range"
+          min="1"
+          max="10"
+          step="0.01"
+          value="1"
+        />
 
         <div class="timeline-foot">
           <span id="timelineStartLabel">шаг 1</span>

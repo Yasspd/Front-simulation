@@ -115,6 +115,14 @@ export class SimulationApiClient {
     return this.request('/latest');
   }
 
+  listRuns(limit = 8) {
+    return this.request(`/runs?limit=${encodeURIComponent(limit)}`);
+  }
+
+  getRunById(runId) {
+    return this.request(`/runs/${encodeURIComponent(runId)}`);
+  }
+
   runSimulation(payload) {
     return this.request('/run', {
       method: 'POST',

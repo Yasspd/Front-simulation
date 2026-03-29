@@ -3,6 +3,9 @@ import {
   formatDecimal,
   humanizeBackendStatus,
   humanizeBackendStatusShort,
+  humanizeMode,
+  humanizeProfile,
+  humanizeRobustObjective,
 } from '../utils/formatters.js';
 
 export class ControlPanel {
@@ -74,6 +77,22 @@ export class ControlPanel {
       stepBackButton: document.getElementById('stepBackButton'),
       stepForwardButton: document.getElementById('stepForwardButton'),
       profileHintCard: document.getElementById('profileHintCard'),
+      causalEnabledToggle: document.getElementById('causalEnabledToggle'),
+      causalTargetSelect: document.getElementById('causalTargetSelect'),
+      causalInterventionsRange: document.getElementById('causalInterventionsRange'),
+      causalInterventionsValue: document.getElementById('causalInterventionsValue'),
+      robustEnabledToggle: document.getElementById('robustEnabledToggle'),
+      robustObjectiveSelect: document.getElementById('robustObjectiveSelect'),
+      robustScenarioCountRange: document.getElementById('robustScenarioCountRange'),
+      robustScenarioCountValue: document.getElementById('robustScenarioCountValue'),
+      uncertaintyEnabledToggle: document.getElementById('uncertaintyEnabledToggle'),
+      uncertaintyLevelSelect: document.getElementById('uncertaintyLevelSelect'),
+      uncertaintyMethodSelect: document.getElementById('uncertaintyMethodSelect'),
+      uncertaintyResamplesRange: document.getElementById('uncertaintyResamplesRange'),
+      uncertaintyResamplesValue: document.getElementById('uncertaintyResamplesValue'),
+      refreshRunsButton: document.getElementById('refreshRunsButton'),
+      recentRunsList: document.getElementById('recentRunsList'),
+      recentRunsMeta: document.getElementById('recentRunsMeta'),
     };
   }
 
@@ -122,6 +141,7 @@ export class ControlPanel {
 
     this.bindEventOverrideInputs();
     this.bindRenderToggles();
+    this.bindAnalysisControls();
 
     this.elements.startButton.addEventListener('click', () => {
       this.session.startSimulation();
@@ -161,6 +181,19 @@ export class ControlPanel {
     });
     this.elements.stepForwardButton.addEventListener('click', () => {
       this.session.stepBy(1);
+    });
+    this.elements.refreshRunsButton.addEventListener('click', () => {
+      this.session.loadRecentRuns();
+    });
+    this.elements.recentRunsList.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-run-id]');
+
+      if (!button) {
+        return;
+      }
+
+      this.session.loadRunById(button.dataset.runId);
+      this.collapsePanelForPlayback();
     });
   }
 
@@ -229,6 +262,101 @@ export class ControlPanel {
       this.session.updateConfig({
         render: {
           nodeScale: Number(event.target.value),
+        },
+      });
+    });
+  }
+
+  bindAnalysisControls() {
+    this.elements.causalEnabledToggle.addEventListener('change', (event) => {
+      this.session.updateConfig({
+        analysisOptions: {
+          causal: {
+            enabled: event.target.checked,
+          },
+        },
+      });
+    });
+    this.elements.causalTargetSelect.addEventListener('change', (event) => {
+      this.session.updateConfig({
+        analysisOptions: {
+          causal: {
+            targetMetric: event.target.value,
+          },
+        },
+      });
+    });
+    this.elements.causalInterventionsRange.addEventListener('input', (event) => {
+      this.session.updateConfig({
+        analysisOptions: {
+          causal: {
+            maxInterventions: Number(event.target.value),
+          },
+        },
+      });
+    });
+
+    this.elements.robustEnabledToggle.addEventListener('change', (event) => {
+      this.session.updateConfig({
+        analysisOptions: {
+          robust: {
+            enabled: event.target.checked,
+          },
+        },
+      });
+    });
+    this.elements.robustObjectiveSelect.addEventListener('change', (event) => {
+      this.session.updateConfig({
+        analysisOptions: {
+          robust: {
+            objective: event.target.value,
+          },
+        },
+      });
+    });
+    this.elements.robustScenarioCountRange.addEventListener('input', (event) => {
+      this.session.updateConfig({
+        analysisOptions: {
+          robust: {
+            scenarioCount: Number(event.target.value),
+          },
+        },
+      });
+    });
+
+    this.elements.uncertaintyEnabledToggle.addEventListener('change', (event) => {
+      this.session.updateConfig({
+        analysisOptions: {
+          uncertainty: {
+            enabled: event.target.checked,
+          },
+        },
+      });
+    });
+    this.elements.uncertaintyLevelSelect.addEventListener('change', (event) => {
+      this.session.updateConfig({
+        analysisOptions: {
+          uncertainty: {
+            level: Number(event.target.value),
+          },
+        },
+      });
+    });
+    this.elements.uncertaintyMethodSelect.addEventListener('change', (event) => {
+      this.session.updateConfig({
+        analysisOptions: {
+          uncertainty: {
+            method: event.target.value,
+          },
+        },
+      });
+    });
+    this.elements.uncertaintyResamplesRange.addEventListener('input', (event) => {
+      this.session.updateConfig({
+        analysisOptions: {
+          uncertainty: {
+            resamples: Number(event.target.value),
+          },
         },
       });
     });
@@ -332,10 +460,46 @@ export class ControlPanel {
     this.elements.nodeScaleRange.value = String(config.render.nodeScale);
     this.elements.nodeScaleValue.textContent = formatDecimal(config.render.nodeScale, 2);
 
+    this.renderAnalysisControls(config.analysisOptions);
     this.renderScenarioOptions(state.scenarios, config.scenarioKey);
     this.renderProfileHint(config.profile, config.mode, state.run);
+    this.renderRunHistory(state.recentRuns, state.run);
     this.renderButtons(playback);
     this.renderError(state.error);
+  }
+
+  renderAnalysisControls(analysisOptions) {
+    this.elements.causalEnabledToggle.checked = analysisOptions.causal.enabled;
+    this.elements.causalTargetSelect.value = analysisOptions.causal.targetMetric;
+    this.elements.causalInterventionsRange.value = String(
+      analysisOptions.causal.maxInterventions,
+    );
+    this.elements.causalInterventionsValue.textContent = String(
+      analysisOptions.causal.maxInterventions,
+    );
+
+    this.elements.robustEnabledToggle.checked = analysisOptions.robust.enabled;
+    this.elements.robustObjectiveSelect.value = analysisOptions.robust.objective;
+    this.elements.robustScenarioCountRange.value = String(
+      analysisOptions.robust.scenarioCount,
+    );
+    this.elements.robustScenarioCountValue.textContent = String(
+      analysisOptions.robust.scenarioCount,
+    );
+
+    this.elements.uncertaintyEnabledToggle.checked =
+      analysisOptions.uncertainty.enabled;
+    this.elements.uncertaintyLevelSelect.value = String(
+      analysisOptions.uncertainty.level,
+    );
+    this.elements.uncertaintyMethodSelect.value =
+      analysisOptions.uncertainty.method;
+    this.elements.uncertaintyResamplesRange.value = String(
+      analysisOptions.uncertainty.resamples,
+    );
+    this.elements.uncertaintyResamplesValue.textContent = String(
+      analysisOptions.uncertainty.resamples,
+    );
   }
 
   renderScenarioOptions(scenarios, selectedKey) {
@@ -378,11 +542,42 @@ export class ControlPanel {
       </ul>
       <strong>Семантика режима:</strong> ${MODE_HINTS[modeKey]}
       <div class="inline-note" style="margin-top: 10px;">
-        Пороги, охлаждение, отложенные эффекты и stress-memory сейчас управляются профилями бэкенда,
-        а не публичным API прямых переопределений.
+        Analysis — это дополнительный слой объяснения и сравнения решений. Он не меняет raw simulation result и включается только по запросу.
       </div>
       ${liveConfig}
     `;
+  }
+
+  renderRunHistory(recentRuns, activeRun) {
+    this.elements.recentRunsMeta.textContent = recentRuns.length
+      ? `запусков: ${recentRuns.length}`
+      : 'история пока пуста';
+
+    if (!recentRuns.length) {
+      this.elements.recentRunsList.innerHTML = `
+        <div class="runs-empty-note">
+          Последние completed run’ы появятся здесь после первого запуска или загрузки latest.
+        </div>
+      `;
+      return;
+    }
+
+    this.elements.recentRunsList.innerHTML = recentRuns
+      .map((run) => {
+        const activeClass = run.runId === activeRun?.runId ? ' is-active' : '';
+
+        return `
+          <button type="button" class="run-record-button${activeClass}" data-run-id="${run.runId}">
+            <span class="run-record-top">
+              <strong>${humanizeMode(run.mode)} / ${humanizeProfile(run.profile)}</strong>
+              <span>${run.status}</span>
+            </span>
+            <span class="run-record-meta">seed ${run.seed} • ${run.entitiesCount} сущностей • ${run.requestedSteps} шагов</span>
+            <span class="run-record-meta">хаос ${formatDecimal(run.summary.finalChaosIndex, 3)} • fail ${formatDecimal(run.summary.failureRate, 3)}</span>
+          </button>
+        `;
+      })
+      .join('');
   }
 
   renderButtons(playback) {
@@ -390,6 +585,10 @@ export class ControlPanel {
     const hasRun = Boolean(state.run);
     const injectArmed = state.config.render.armInject;
     const backendLocked = playback.isLoading;
+    const hasAnalysisEnabled =
+      state.config.analysisOptions.causal.enabled ||
+      state.config.analysisOptions.robust.enabled ||
+      state.config.analysisOptions.uncertainty.enabled;
 
     this.elements.pauseButton.textContent = playback.isPaused ? 'Продолжить' : 'Пауза';
     this.elements.injectButton.textContent = injectArmed
@@ -403,14 +602,35 @@ export class ControlPanel {
     this.elements.injectButton.disabled = backendLocked;
     this.elements.centerEventButton.disabled = backendLocked;
     this.elements.randomEventButton.disabled = backendLocked;
+    this.elements.refreshRunsButton.disabled = backendLocked;
     this.elements.injectButton.classList.toggle('primary-button', injectArmed);
     this.elements.floatingHint.textContent = injectArmed
       ? 'Режим внедрения активирован. Короткое нажатие по полю перезапустит бэкенд с текущего шага, а перетаскивание продолжит двигать камеру.'
-      : 'Поле можно перетаскивать мышью или пальцем. Колесо мыши и щипок двумя пальцами меняют масштаб.';
+      : hasAnalysisEnabled
+        ? `Поле можно перетаскивать мышью или пальцем. Текущий запуск пойдёт с analysis: ${this.describeEnabledAnalysis(state.config.analysisOptions)}.`
+        : 'Поле можно перетаскивать мышью или пальцем. Колесо мыши и щипок двумя пальцами меняют масштаб.';
   }
 
   renderError(error) {
     this.elements.errorPanel.classList.toggle('hidden', !error);
     this.elements.errorPanel.textContent = error;
+  }
+
+  describeEnabledAnalysis(analysisOptions) {
+    const enabled = [];
+
+    if (analysisOptions.causal.enabled) {
+      enabled.push('causal');
+    }
+
+    if (analysisOptions.robust.enabled) {
+      enabled.push(`robust (${humanizeRobustObjective(analysisOptions.robust.objective)})`);
+    }
+
+    if (analysisOptions.uncertainty.enabled) {
+      enabled.push('uncertainty');
+    }
+
+    return enabled.join(', ');
   }
 }

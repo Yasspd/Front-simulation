@@ -4,6 +4,7 @@ import { CanvasRenderer } from './renderer/canvas-renderer.js';
 import { buildPlaybackSnapshot } from './session/playback-selectors.js';
 import { SimulationSession } from './session/simulation-session.js';
 import { SessionStore } from './state/session-store.js';
+import { AnalysisPanel } from './ui/analysis-panel.js';
 import { ControlPanel } from './ui/control-panel.js';
 import { StatsOverlay } from './ui/stats-overlay.js';
 import { TimelinePanel } from './ui/timeline-panel.js';
@@ -31,6 +32,7 @@ const renderer = new CanvasRenderer(document.getElementById('simulation-canvas')
 });
 
 const controlPanel = new ControlPanel(document.getElementById('controlPanel'), store, session);
+const analysisPanel = new AnalysisPanel(document.getElementById('analysisPanel'));
 const statsOverlay = new StatsOverlay();
 const timelinePanel = new TimelinePanel(session);
 
@@ -49,6 +51,7 @@ function frame(now) {
 
   renderer.render(viewState, playbackSnapshot);
   statsOverlay.render(viewState, playbackSnapshot);
+  analysisPanel.render(viewState);
   timelinePanel.render(viewState, playbackSnapshot);
 
   requestAnimationFrame(frame);
@@ -60,5 +63,6 @@ window.frontSimulation = {
   store,
   session,
   renderer,
+  analysisPanel,
   controlPanel,
 };
